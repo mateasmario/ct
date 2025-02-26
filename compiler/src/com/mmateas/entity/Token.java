@@ -49,6 +49,8 @@ public class Token {
         NEWLINE_WINDOWS(Category.SPACE, "\r"),
         TAB(Category.SPACE, "\t");
 
+        public static final String ALLOWED_ESCAPE_CHARACTERS = "abfnrtv'?\"\\0";
+
         public enum Category {
             NONE, KEYWORD, CONSTANT, DELIMITER, OPERATOR, SPACE
         }

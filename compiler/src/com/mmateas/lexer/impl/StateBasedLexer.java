@@ -15,7 +15,18 @@ public class StateBasedLexer implements Lexer {
         ZERO_FIRST(3),
         BASE_16_X(4),
         BASE_16_DIGITS(5),
-        BASE_8(6);
+        BASE_8(6),
+        REAL_DOT(7),
+        REAL_AFTER_DOT(8),
+        EXP(9),
+        EXP_AFTER_SIGN(10),
+        EXP_AFTER_SIGN_MANDATORY_DIGIT(11),
+        COMPOSED_OPERATOR(12),
+        CHAR(13),
+        CHAR_ESC(14),
+        CHAR_AFTER_START(15),
+        STRING(16),
+        STRING_ESC(17);
 
         private int value;
 
@@ -25,14 +36,13 @@ public class StateBasedLexer implements Lexer {
     }
 
     private LexerState state = LexerState.INIT;
+    private List<Token> tokens = new ArrayList<>();
+    private StringBuilder tokenValue = new StringBuilder();
+    private LexerState nextState = LexerState.INIT;
+    private int currentLine;
 
     @Override
     public List<Token> analyze(String input) throws LexerException {
-        List<Token> tokens = new ArrayList<>();
-        StringBuilder tokenValue = new StringBuilder();
-        LexerState nextState = LexerState.INIT;
-        int currentLine = 0;
-
         int i = 0;
 
         while (i < input.length()) {
@@ -60,7 +70,22 @@ public class StateBasedLexer implements Lexer {
                     } else if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
                         tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
                         nextState = LexerState.ZERO_FIRST;
-                    } else {
+                    } else if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.OPERATOR)) {
+                        if (ch == '=' || ch == '!' || ch == '<' || ch == '>') {
+                            tokenValue.append(ch);
+                            nextState = LexerState.COMPOSED_OPERATOR;
+                        } else {
+                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+                            nextState = LexerState.INIT;
+                        }
+                    }
+                    else if (ch == '\'') {
+                        nextState = LexerState.CHAR;
+                    }
+                    else if (ch == '"') {
+                        nextState = LexerState.STRING;
+                    }
+                    else {
                         throw new LexerException("Unexpected character " + ch + " on line " + currentLine + ".");
                     }
                 }
@@ -70,17 +95,8 @@ public class StateBasedLexer implements Lexer {
                             || ch == '_') {
                         tokenValue.append(ch);
                         nextState = LexerState.LETTER_FIRST;
-                    } else if (Character.isSpaceChar(ch)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
-                        tokens.add(new Token(Token.Type.ID, tokenValue.toString()));
-
-                        // If Symbol came after the built token, also add the symbol to the list of tokens
-                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
-                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
-                        }
-
-                        nextState = LexerState.INIT;
+                    } else if (isNewTokenWithoutSpace(ch)) {
+                        manageBothTokens(ch);
                     } else {
                         throw new LexerException("Unexpected character " + ch + " on line " + currentLine + ".");
                     }
@@ -91,20 +107,15 @@ public class StateBasedLexer implements Lexer {
                     } else if (Character.isDigit(ch)) {
                         tokenValue.append(ch);
                         nextState = LexerState.DIGIT_FIRST;
-                    } else if (Character.isSpaceChar(ch)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
-                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
-
-                        // If Symbol came after the built token, also add the symbol to the list of tokens
-                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
-                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
-                        }
-
-                        nextState = LexerState.INIT;
-                    }
-                    // ToDo: Manage DOT (for REAL)
-                    else {
+                    } else if (ch == '.') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.REAL_DOT;
+                    } else if (ch == 'e' || ch == 'E') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.EXP;
+                    } else if (isNewTokenWithoutSpace(ch)) {
+                        manageBothTokens(ch);
+                    } else {
                         throw new LexerException("Wrong number format on line " + currentLine + ".");
                     }
                 }
@@ -119,21 +130,12 @@ public class StateBasedLexer implements Lexer {
                             tokenValue.append(ch);
                             nextState = LexerState.BASE_8;
                         }
-                    }
-                    // ToDo: Manage DOT (for REAL)
-                    else if (Character.isSpaceChar(ch)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
-                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
-
-                        // If Symbol came after the built token, also add the symbol to the list of tokens
-                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
-                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
-                        }
-
-                        nextState = LexerState.INIT;
-                    }
-                    else {
+                    } else if (ch == '.') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.REAL_DOT;
+                    } else if (isNewTokenWithoutSpace(ch)) {
+                        manageBothTokens(ch);
+                    } else {
                         throw new LexerException("Wrong number format on line " + currentLine + ".");
                     }
                 }
@@ -163,20 +165,9 @@ public class StateBasedLexer implements Lexer {
                         } else {
                             throw new LexerException("Wrong hexadecimal number format on line " + currentLine + ".");
                         }
-                    }
-                    else if (Character.isSpaceChar(ch)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
-                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
-                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
-
-                        // If Symbol came after the built token, also add the symbol to the list of tokens
-                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
-                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
-                        }
-
-                        nextState = LexerState.INIT;
-                    }
-                    else {
+                    } else if (isNewTokenWithoutSpace(ch)) {
+                        manageBothTokens(ch);
+                    } else {
                         throw new LexerException("Wrong hexadecimal number format on line " + currentLine + ".");
                     }
                 }
@@ -184,13 +175,11 @@ public class StateBasedLexer implements Lexer {
                     if (Character.isDigit(ch)) {
                         if (ch >= '8') {
                             throw new LexerException("Wrong octal number format on line " + currentLine + ".");
-                        }
-                        else {
+                        } else {
                             tokenValue.append(ch);
                             nextState = LexerState.BASE_8;
                         }
-                    }
-                    else if (Character.isSpaceChar(ch)
+                    } else if (Character.isSpaceChar(ch)
                             || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
                             || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
                         tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
@@ -201,9 +190,122 @@ public class StateBasedLexer implements Lexer {
                         }
 
                         nextState = LexerState.INIT;
+                    } else {
+                        throw new LexerException("Wrong octal number format on line " + currentLine + ".");
+                    }
+                }
+                case REAL_DOT -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.REAL_AFTER_DOT;
+                    } else {
+                        throw new LexerException("Wrong decimal number format on line " + currentLine + ".");
+                    }
+                }
+                case REAL_AFTER_DOT -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.REAL_AFTER_DOT;
+                    } else if (ch == 'e' || ch == 'E') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.EXP;
+                    } else if (isNewTokenWithoutSpace(ch)) {
+                        manageBothTokens(ch);
+                    } else {
+                        throw new LexerException("Wrong decimal number format on line " + currentLine + ".");
+                    }
+                }
+                case EXP -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.EXP_AFTER_SIGN;
+                    } else if (ch == '+' || ch == '-') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.EXP_AFTER_SIGN_MANDATORY_DIGIT;
+                    } else {
+                        throw new LexerException("Wrong decimal number format on line " + currentLine + ".");
+                    }
+                }
+                case EXP_AFTER_SIGN -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.EXP_AFTER_SIGN;
+                    } else if (isNewTokenWithoutSpace(ch)) {
+                        manageBothTokens(ch);
+                    } else {
+                        throw new LexerException("Wrong decimal number format on line " + currentLine + ".");
+                    }
+
+                }
+                case EXP_AFTER_SIGN_MANDATORY_DIGIT -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.EXP_AFTER_SIGN;
+                    } else {
+                        throw new LexerException("Wrong decimal number format on line " + currentLine + ".");
+                    }
+                }
+                case COMPOSED_OPERATOR -> {
+                    if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.OPERATOR)) {
+                        tokens.add(new Token(Token.Type.parse(String.valueOf(tokenValue))));
                     }
                     else {
-                        throw new LexerException("Wrong octal number format on line " + currentLine + ".");
+                        i--;
+                    }
+                    nextState = LexerState.INIT;
+                }
+                case CHAR -> {
+                    if (ch == '\'') {
+                        throw new LexerException("Invalid character format on line " + currentLine + ".");
+                    }
+                    else if (ch == '\\') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.CHAR_ESC;
+                    }
+                    else  {
+                        tokenValue.append(ch);
+                        nextState = LexerState.CHAR_AFTER_START;
+                    }
+                }
+                case CHAR_ESC -> {
+                    if (Token.Type.ALLOWED_ESCAPE_CHARACTERS.contains(String.valueOf(ch))) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.CHAR_AFTER_START;
+                    }
+                    else {
+                        throw new LexerException("Invalid character format on line " + currentLine + ".");
+                    }
+                }
+                case CHAR_AFTER_START -> {
+                    if (ch != '\'') {
+                        throw new LexerException("Invalid character format on line " + currentLine + ".");
+                    }
+                    else {
+                        tokens.add(new Token(Token.Type.CT_CHAR, tokenValue.toString().charAt(0)));
+                        nextState = LexerState.INIT;
+                    }
+                }
+                case STRING -> {
+                    if (ch == '"') {
+                        tokens.add(new Token(Token.Type.CT_STRING, tokenValue.toString()));
+                        nextState = LexerState.INIT;
+                    }
+                    else if (ch == '\\') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.STRING_ESC;
+                    }
+                    else {
+                        tokenValue.append(ch);
+                        nextState = LexerState.STRING;
+                    }
+                }
+                case STRING_ESC -> {
+                    if (Token.Type.ALLOWED_ESCAPE_CHARACTERS.contains(String.valueOf(ch))) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.STRING;
+                    }
+                    else {
+                        throw new LexerException("Invalid string format on line " + currentLine + ".");
                     }
                 }
             }
@@ -214,5 +316,27 @@ public class StateBasedLexer implements Lexer {
         return tokens;
     }
 
+    private boolean isNewTokenWithoutSpace(char ch) {
+        return Character.isSpaceChar(ch)
+                || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)
+                || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.OPERATOR);
+    }
 
+    private void manageBothTokens(char ch) {
+        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
+
+        // If Symbol came after the built token, also add the symbol to the list of tokens
+        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.OPERATOR)) {
+            if (ch == '=' || ch == '!' || ch == '<' || ch == '>') {
+                tokenValue.append(ch);
+                nextState = LexerState.COMPOSED_OPERATOR;
+            } else {
+                tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+            }
+        }
+
+        nextState = LexerState.INIT;
+    }
 }
