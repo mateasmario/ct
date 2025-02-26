@@ -3,72 +3,84 @@ package com.mmateas.entity;
 import com.mmateas.lexer.exception.LexerException;
 import com.mmateas.lexer.exception.impl.TokenMappingException;
 
-import java.util.List;
-
 public class Token {
     public enum Type {
-        ID,
-        BREAK,
-        CHAR,
-        DOUBLE,
-        ELSE,
-        FOR,
-        IF,
-        INT,
-        RETURN,
-        STRUCT,
-        VOID,
-        WHILE,
-        CT_INT,
-        CT_REAL,
-        CT_CHAR,
-        CT_STRING,
-        COMMA,
-        SEMICOLON,
-        LPAR,
-        RPAR,
-        LBRACKET,
-        RBRACKET,
-        LACC,
-        RACC,
-        ADD,
-        SUB,
-        MULT,
-        DIV,
-        DOT,
-        AND,
-        OR,
-        NOT,
-        ASSIGN,
-        EQUAL,
-        NOTEQ,
-        LESS,
-        LESSEQ,
-        GREATER,
-        GREATEREQ;
+        ID(Category.NONE),
+        BREAK(Category.KEYWORD, "break"),
+        CHAR(Category.KEYWORD, "char"),
+        DOUBLE(Category.KEYWORD, "double"),
+        ELSE(Category.KEYWORD, "else"),
+        FOR(Category.KEYWORD, "for"),
+        IF(Category.KEYWORD, "if"),
+        INT(Category.KEYWORD, "int"),
+        RETURN(Category.KEYWORD, "return"),
+        STRUCT(Category.KEYWORD, "struct"),
+        VOID(Category.KEYWORD, "void"),
+        WHILE(Category.KEYWORD, "while"),
+        CT_INT(Category.CONSTANT),
+        CT_REAL(Category.CONSTANT),
+        CT_CHAR(Category.CONSTANT),
+        CT_STRING(Category.CONSTANT),
+        COMMA(Category.DELIMITER, ","),
+        SEMICOLON(Category.DELIMITER, ";"),
+        LPAR(Category.DELIMITER, "("),
+        RPAR(Category.DELIMITER, ")"),
+        LBRACKET(Category.DELIMITER, "["),
+        RBRACKET(Category.DELIMITER, "]"),
+        LACC(Category.DELIMITER, "{"),
+        RACC(Category.DELIMITER, "}"),
+        ADD(Category.OPERATOR, "+"),
+        SUB(Category.OPERATOR, "-"),
+        MULT(Category.OPERATOR, "*"),
+        DIV(Category.OPERATOR, "/"),
+        DOT(Category.OPERATOR, "."),
+        AND(Category.OPERATOR, "&&"),
+        OR(Category.OPERATOR, "||"),
+        NOT(Category.OPERATOR, "!"),
+        ASSIGN(Category.OPERATOR, "="),
+        EQUAL(Category.OPERATOR, "=="),
+        NOTEQ(Category.OPERATOR, "!="),
+        LESS(Category.OPERATOR, "<"),
+        LESSEQ(Category.OPERATOR, "<="),
+        GREATER(Category.OPERATOR, ">"),
+        GREATEREQ(Category.OPERATOR, ">="),
+        SPACE(Category.SPACE, " "),
+        NEWLINE(Category.SPACE, "\n"),
+        NEWLINE_WINDOWS(Category.SPACE, "\r"),
+        TAB(Category.SPACE, "\t");
 
-        public static final String SYMBOLS = ",;([{}])";
+        public enum Category {
+            NONE, KEYWORD, CONSTANT, DELIMITER, OPERATOR, SPACE
+        }
 
-        public static Token.Type fromSymbol(char ch) throws LexerException {
-            if (ch == ',') {
-                return Token.Type.COMMA;
-            } else if (ch == ';') {
-                return Token.Type.SEMICOLON;
-            } else if (ch == '(') {
-                return Token.Type.LPAR;
-            } else if (ch == ')') {
-                return Token.Type.RPAR;
-            } else if (ch == '[') {
-                return Token.Type.LBRACKET;
-            } else if (ch == ']') {
-                return Token.Type.RPAR;
-            } else if (ch == '{') {
-                return Token.Type.LACC;
-            } else if (ch == '}') {
-                return Token.Type.RACC;
+        private Category category;
+        private String value;
+
+        Type(Category category) {
+            this.category = category;
+        }
+
+        Type(Category category, String value) {
+            this.category = category;
+            this.value = value;
+        }
+
+        public static Type parse(String input) {
+            for(Type type : Type.values()) {
+                if (type.getValue().equalsIgnoreCase(input)) {
+                    return type;
+                }
             }
 
-            throw new TokenMappingException("Cannot map token with value " + ch + " to symbol.");
+            return ID;
+        }
+
+        public Category getCategory() {
+            return category;
+        }
+
+        public String getValue() {
+            return value;
         }
     }
 

@@ -9,8 +9,13 @@ import java.util.List;
 
 public class StateBasedLexer implements Lexer {
     private enum LexerState {
-        ZERO(0),
-        ONE(1);
+        INIT(0),
+        LETTER_FIRST(1),
+        DIGIT_FIRST(2),
+        ZERO_FIRST(3),
+        BASE_16_X(4),
+        BASE_16_DIGITS(5),
+        BASE_8(6);
 
         private int value;
 
@@ -19,72 +24,186 @@ public class StateBasedLexer implements Lexer {
         }
     }
 
-    private LexerState state = LexerState.ZERO;
+    private LexerState state = LexerState.INIT;
 
     @Override
     public List<Token> analyze(String input) throws LexerException {
         List<Token> tokens = new ArrayList<>();
         StringBuilder tokenValue = new StringBuilder();
-        LexerState nextState = LexerState.ZERO;
+        LexerState nextState = LexerState.INIT;
+        int currentLine = 0;
 
         int i = 0;
 
         while (i < input.length()) {
             char ch = input.charAt(i);
 
+            if (ch == '\n') {
+                currentLine++;
+            }
+
             switch (state) {
-                case ZERO -> {
+                case INIT -> {
                     tokenValue = new StringBuilder();
 
                     if (Character.isAlphabetic(ch)) {
                         tokenValue.append(ch);
-                        nextState = LexerState.ONE;
+                        nextState = LexerState.LETTER_FIRST;
+                    } else if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+
+                        if (ch == '0') {
+                            nextState = LexerState.ZERO_FIRST;
+                        } else {
+                            nextState = LexerState.DIGIT_FIRST;
+                        }
+                    } else if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
+                        tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+                        nextState = LexerState.ZERO_FIRST;
+                    } else {
+                        throw new LexerException("Unexpected character " + ch + " on line " + currentLine + ".");
                     }
-                    else if (Token.Type.SYMBOLS.contains(String.valueOf(ch))) {
-                        tokens.add(new Token(Token.Type.fromSymbol(ch)));
-                        nextState = LexerState.ZERO;
-                    }
-                    // ToDo: continue with numbers
                 }
-                case ONE -> {
+                case LETTER_FIRST -> {
                     if (Character.isAlphabetic(ch)
                             || Character.isDigit(ch)
                             || ch == '_') {
                         tokenValue.append(ch);
-                        nextState = LexerState.ONE;
-                    } else if (Character.isSpaceChar(ch) || Token.Type.SYMBOLS.contains(String.valueOf(ch))) {
-                        if (tokenValue.toString().equalsIgnoreCase("break")) {
-                            tokens.add(new Token(Token.Type.BREAK));
-                        } else if (tokenValue.toString().equalsIgnoreCase("char")) {
-                            tokens.add(new Token(Token.Type.CHAR));
-                        } else if (tokenValue.toString().equalsIgnoreCase("double")) {
-                            tokens.add(new Token(Token.Type.DOUBLE));
-                        } else if (tokenValue.toString().equalsIgnoreCase("else")) {
-                            tokens.add(new Token(Token.Type.ELSE));
-                        } else if (tokenValue.toString().equalsIgnoreCase("for")) {
-                            tokens.add(new Token(Token.Type.FOR));
-                        } else if (tokenValue.toString().equalsIgnoreCase("if")) {
-                            tokens.add(new Token(Token.Type.IF));
-                        } else if (tokenValue.toString().equalsIgnoreCase("int")) {
-                            tokens.add(new Token(Token.Type.INT));
-                        } else if (tokenValue.toString().equalsIgnoreCase("return")) {
-                            tokens.add(new Token(Token.Type.RETURN));
-                        } else if (tokenValue.toString().equalsIgnoreCase("struct")) {
-                            tokens.add(new Token(Token.Type.STRUCT));
-                        } else if (tokenValue.toString().equalsIgnoreCase("void")) {
-                            tokens.add(new Token(Token.Type.VOID));
-                        } else if (tokenValue.toString().equalsIgnoreCase("while")) {
-                            tokens.add(new Token(Token.Type.WHILE));
-                        } else {
-                            tokens.add(new Token(Token.Type.ID, tokenValue));
-                        }
+                        nextState = LexerState.LETTER_FIRST;
+                    } else if (Character.isSpaceChar(ch)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
+                        tokens.add(new Token(Token.Type.ID, tokenValue.toString()));
 
                         // If Symbol came after the built token, also add the symbol to the list of tokens
-                        if (Token.Type.SYMBOLS.contains(String.valueOf(ch))) {
-                            tokens.add(new Token(Token.Type.fromSymbol(ch)));
+                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
+                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
                         }
 
-                        nextState = LexerState.ZERO;
+                        nextState = LexerState.INIT;
+                    } else {
+                        throw new LexerException("Unexpected character " + ch + " on line " + currentLine + ".");
+                    }
+                }
+                case DIGIT_FIRST -> {
+                    if (Character.isAlphabetic(ch)) {
+                        throw new LexerException("Unexpected character " + ch + " on line " + currentLine + ".");
+                    } else if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.DIGIT_FIRST;
+                    } else if (Character.isSpaceChar(ch)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
+                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
+
+                        // If Symbol came after the built token, also add the symbol to the list of tokens
+                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
+                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+                        }
+
+                        nextState = LexerState.INIT;
+                    }
+                    // ToDo: Manage DOT (for REAL)
+                    else {
+                        throw new LexerException("Wrong number format on line " + currentLine + ".");
+                    }
+                }
+                case ZERO_FIRST -> {
+                    if (ch == 'x' || ch == 'X') {
+                        tokenValue.append(ch);
+                        nextState = LexerState.BASE_16_X;
+                    } else if (Character.isDigit(ch)) {
+                        if (ch >= '8') {
+                            throw new LexerException("Wrong octal number format on line " + currentLine + ".");
+                        } else {
+                            tokenValue.append(ch);
+                            nextState = LexerState.BASE_8;
+                        }
+                    }
+                    // ToDo: Manage DOT (for REAL)
+                    else if (Character.isSpaceChar(ch)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
+                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
+
+                        // If Symbol came after the built token, also add the symbol to the list of tokens
+                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
+                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+                        }
+
+                        nextState = LexerState.INIT;
+                    }
+                    else {
+                        throw new LexerException("Wrong number format on line " + currentLine + ".");
+                    }
+                }
+                case BASE_16_X -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.BASE_16_DIGITS;
+                    } else if (Character.isAlphabetic(ch)) {
+                        if (ch >= 'A' && ch <= 'F') {
+                            tokenValue.append(ch);
+                            nextState = LexerState.BASE_16_DIGITS;
+                        } else {
+                            throw new LexerException("Wrong hexadecimal number format on line " + currentLine + ".");
+                        }
+                    } else {
+                        throw new LexerException("Wrong hexadecimal number format on line " + currentLine + ".");
+                    }
+                }
+                case BASE_16_DIGITS -> {
+                    if (Character.isDigit(ch)) {
+                        tokenValue.append(ch);
+                        nextState = LexerState.BASE_16_DIGITS;
+                    } else if (Character.isAlphabetic(ch)) {
+                        if (ch >= 'A' && ch <= 'F') {
+                            tokenValue.append(ch);
+                            nextState = LexerState.BASE_16_DIGITS;
+                        } else {
+                            throw new LexerException("Wrong hexadecimal number format on line " + currentLine + ".");
+                        }
+                    }
+                    else if (Character.isSpaceChar(ch)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
+                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
+
+                        // If Symbol came after the built token, also add the symbol to the list of tokens
+                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
+                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+                        }
+
+                        nextState = LexerState.INIT;
+                    }
+                    else {
+                        throw new LexerException("Wrong hexadecimal number format on line " + currentLine + ".");
+                    }
+                }
+                case BASE_8 -> {
+                    if (Character.isDigit(ch)) {
+                        if (ch >= '8') {
+                            throw new LexerException("Wrong octal number format on line " + currentLine + ".");
+                        }
+                        else {
+                            tokenValue.append(ch);
+                            nextState = LexerState.BASE_8;
+                        }
+                    }
+                    else if (Character.isSpaceChar(ch)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)
+                            || Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.SPACE)) {
+                        tokens.add(new Token(Token.Type.INT, Integer.valueOf(tokenValue.toString())));
+
+                        // If Symbol came after the built token, also add the symbol to the list of tokens
+                        if (Token.Type.parse(String.valueOf(ch)).getCategory().equals(Token.Type.Category.DELIMITER)) {
+                            tokens.add(new Token(Token.Type.parse(String.valueOf(ch))));
+                        }
+
+                        nextState = LexerState.INIT;
+                    }
+                    else {
+                        throw new LexerException("Wrong octal number format on line " + currentLine + ".");
                     }
                 }
             }
