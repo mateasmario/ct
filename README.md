@@ -23,7 +23,7 @@ The analysis phase consists of three types of analysis:
 
 The lexical analyzer's function is to divide the input source code into logical units called "tokens", which are logical units meaningful to a certain programming language. Tokens can be anything from identifiers (e.g. `bar`, `foo`) to reserved keywords (e.g. `int`, `char`, `double`), operators (e.g. `+`, `/`, `&&`) or constants (e.g. `5`, `"username"`, `0x4F`).
 
-The analyzer makes sure that tokens have a correct format and no forbidden symbols have been used in the input. For example, an identifier cannot start with a digit, or a number in a hexadecimal format cannot contain letters that come after "F". The parsing is done according to certain lexical rules, which are written in a [REGEX](https://en.wikipedia.org/wiki/Regular_expression)-like format.
+The analyzer makes sure that tokens have a correct format and no forbidden symbols have been used in the input. For example, an identifier cannot start with a digit, or a number in a hexadecimal format cannot contain letters that come after character `F`. The parsing is done according to certain lexical rules, which are written in a [REGEX](https://en.wikipedia.org/wiki/Regular_expression)-like format.
 
 The entire list of AtomC's lexical rules can be found [here](LEXICAL_RULES.md), and should be implemented using a [FSM (Finite-state machine)](https://en.wikipedia.org/wiki/Finite-state_machine). One may start with an initial state, and move to other corresponding states based on every new character read from the input. A certain state only allows a set of possible inputs, leading to the failure of the entire compilation process, if an invalid character is read.
 
