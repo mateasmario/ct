@@ -21,11 +21,15 @@ public class Compiler {
             throw new CompilerException("Provided input is null.");
         }
 
+        List<Token> tokens;
+
         try {
-            List<Token> tokens = lexer.analyze(input);
+            tokens = lexer.analyze(input);
         } catch(LexerException ex) {
             throw new CompilerException(ex);
         }
+
+        Token.printList(tokens);
 
         // ...
     }

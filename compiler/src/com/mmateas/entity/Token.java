@@ -3,6 +3,8 @@ package com.mmateas.entity;
 import com.mmateas.lexer.exception.LexerException;
 import com.mmateas.lexer.exception.impl.TokenMappingException;
 
+import java.util.List;
+
 public class Token {
     public enum Type {
         ID(Category.NONE),
@@ -68,8 +70,8 @@ public class Token {
         }
 
         public static Type parse(String input) {
-            for(Type type : Type.values()) {
-                if (type.getValue().equalsIgnoreCase(input)) {
+            for (Type type : Type.values()) {
+                if (type.getValue() != null && type.getValue().equalsIgnoreCase(input)) {
                     return type;
                 }
             }
@@ -96,5 +98,34 @@ public class Token {
 
     public Token(Type type) {
         this.type = type;
+    }
+
+    public Type getType() {
+        return type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
+    }
+
+    public Object getValue() {
+        return value;
+    }
+
+    public void setValue(Object value) {
+        this.value = value;
+    }
+
+    public static void printList(List<Token> input) {
+        for (Token t : input) {
+            System.out.print(t.type);
+
+            if ((t.type.getCategory() != null && t.type.getCategory() == Type.Category.CONSTANT)
+                    || t.type == Type.ID) {
+                System.out.print(" (" + t.value + ")");
+            }
+
+            System.out.print("\n");
+        }
     }
 }
