@@ -4,6 +4,8 @@ import com.mmateas.compiler.exception.CompilerException;
 import com.mmateas.lexer.Lexer;
 import com.mmateas.lexer.impl.StateBasedLexer;
 import com.mmateas.compiler.Compiler;
+import com.mmateas.syntax.SyntacticAnalyzer;
+import com.mmateas.syntax.impl.ResursiveDescendentSyntacticAnalyzer;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,7 +16,8 @@ public class Main {
 
     public static void main(String[] args) throws CompilerException {
         Lexer lexer = new StateBasedLexer();
-        Compiler compiler = new Compiler(lexer);
+        SyntacticAnalyzer syntacticAnalyzer = new ResursiveDescendentSyntacticAnalyzer();
+        Compiler compiler = new Compiler(lexer, syntacticAnalyzer);
 
         List<String> readLines;
 
