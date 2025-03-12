@@ -1,8 +1,5 @@
 package com.mmateas.entity;
 
-import com.mmateas.lexer.exception.LexerException;
-import com.mmateas.lexer.exception.impl.TokenMappingException;
-
 import java.util.List;
 
 public class Token {
@@ -33,7 +30,7 @@ public class Token {
         RACC(Category.DELIMITER, "}"),
         ADD(Category.OPERATOR, "+"),
         SUB(Category.OPERATOR, "-"),
-        MULT(Category.OPERATOR, "*"),
+        MUL(Category.OPERATOR, "*"),
         DIV(Category.OPERATOR, "/"),
         DOT(Category.OPERATOR, "."),
         AND(Category.OPERATOR, "&&"),
