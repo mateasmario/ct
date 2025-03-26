@@ -20,7 +20,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         }
 
         while (currentIndex != tokens.size() - 1) {
-            // ToDo: Other rules...
+            unit();
         }
     }
 
@@ -195,30 +195,35 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             return false;
         }
 
-        if (consume(Token.Type.LPAR)) {
-            if (funcArg()) {
-                while (true) {
-                    if (consume(Token.Type.COMMA)) {
-                        if (funcArg()) {
-                            break;
+        if (consume(Token.Type.ID)) {
+            if (consume(Token.Type.LPAR)) {
+                if (funcArg()) {
+                    while (true) {
+                        if (consume(Token.Type.COMMA)) {
+                            if (funcArg()) {
+                                break;
+                            }
+                        } else {
+                            throw new SyntacticAnalyzerException("Expected function argument after comma.");
                         }
-                    } else {
-                        throw new SyntacticAnalyzerException("Expected function argument after comma.");
                     }
                 }
-            }
 
-            if (consume(Token.Type.RPAR)) {
-                if (stmCompound()) {
-                    return true;
+                if (consume(Token.Type.RPAR)) {
+                    if (stmCompound()) {
+                        return true;
+                    } else {
+                        throw new ExpectedExpressionException("Expected function body.");
+                    }
                 } else {
-                    throw new ExpectedExpressionException("Expected function body.");
+                    throw new SyntacticAnalyzerException("Expected ) after function arguments.");
                 }
             } else {
-                throw new SyntacticAnalyzerException("Expected ) after function arguments.");
+                throw new SyntacticAnalyzerException("Expected ( after function identifier.");
             }
         } else {
-            throw new SyntacticAnalyzerException("Expected ( after function identifier.");
+            currentIndex = startIndex;
+            return false;
         }
     }
 
@@ -368,7 +373,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
     }
 
     @SyntacticRule("exprAssign")
-    private boolean expr() {
+    private boolean expr() throws SyntacticAnalyzerException {
         int startIndex = currentIndex;
 
         if (exprAssign()) {
@@ -401,7 +406,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
     @SyntacticRule("exprOr OR exprAnd | exprAnd")
     @SyntacticRuleForLeftRecursion("exprAnd exprOr1")
-    private boolean exprOr() {
+    private boolean exprOr() throws SyntacticAnalyzerException {
         int startToken = currentIndex;
 
         if (exprAnd()) {
@@ -469,7 +474,132 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         }
     }
 
-    // ToDo: Lipsesc exprEq, exprRel si exprAdd
+    @SyntacticRule("exprEq (EQUAL | NOTEQ) exprRel | exprRel")
+    @SyntacticRuleForLeftRecursion("exprRel exprEq1")
+    private boolean exprEq() throws SyntacticAnalyzerException {
+        int startIndex = currentIndex;
+
+        if (exprRel()) {
+            exprEq1();
+            return true;
+        } else {
+            currentIndex = startIndex;
+            return false;
+        }
+    }
+
+    @HelperMethodForLeftRecursion
+    @SyntacticRule("""
+            exprEq ( EQUAL | NOTEQ ) exprRel | exprRel
+            | ε
+            """)
+    private boolean exprEq1() throws SyntacticAnalyzerException {
+        int startIndex = currentIndex;
+
+        if (consume(Token.Type.EQUAL)) {
+            if (exprRel()) {
+                if (exprEq1()) {
+                    return true;
+                } else {
+                    throw new ExpectedExpressionException("Expected equals expression after comparison expression.");
+                }
+            } else {
+                throw new ExpectedExpressionException("Expected comparison expression after = operator.");
+            }
+        } else if (consume(Token.Type.NOTEQ)) {
+            if (exprRel()) {
+                if (exprEq1()) {
+                    return true;
+                } else {
+                    throw new ExpectedExpressionException("Expected equals expression after comparison expression.");
+                }
+            } else {
+                throw new ExpectedExpressionException("Expected comparison expression after != operator.");
+            }
+        } else {
+            currentIndex = startIndex;
+            return false;
+        }
+    }
+
+    // ToDo: Finish exprRel, exprAdd
+    @SyntacticRule("exprRel ( LESS | LESSEQ | GREATER | GREATEREQ ) exprAdd | exprAdd")
+    @SyntacticRuleForLeftRecursion("exprAdd exprRel1")
+    private boolean exprRel() throws SyntacticAnalyzerException {
+        int startIndex = currentIndex;
+
+        if (exprAdd()) {
+            exprRel1();
+            return true;
+        } else {
+            currentIndex = startIndex;
+            return false;
+        }
+    }
+
+    @HelperMethodForLeftRecursion
+    @SyntacticRule("(LESS | LESSEQ | GREATER | GREATEREQ) exprAdd exprRel1 | ε")
+    private boolean exprRel1() throws SyntacticAnalyzerException {
+        int startIndex = currentIndex;
+
+        if (consume(Token.Type.LESS)) {
+
+        } else if (consume(Token.Type.LESSEQ)) {
+        } else if (consume(Token.Type.GREATER)) {
+        }
+        if (consume(Token.Type.GREATEREQ)) {
+        } else {
+            currentIndex = startIndex;
+            return false;
+        }
+
+        if (exprAdd()) {
+            if (exprRel1()) {
+                return true;
+            } else {
+                throw new ExpectedExpressionException("Expected comparison expression after addition expression.");
+            }
+        } else {
+            throw new ExpectedExpressionException("Expected addition expression after comparison operator.");
+        }
+    }
+
+    @SyntacticRule("exprAdd ( ADD | SUB ) exprMul | exprMul")
+    @SyntacticRuleForLeftRecursion("exprMul exprAdd1")
+    private boolean exprAdd() throws SyntacticAnalyzerException {
+        int startIndex = currentIndex;
+
+        if (exprMul()) {
+            exprAdd1();
+            return true;
+        } else {
+            currentIndex = startIndex;
+            return false;
+        }
+    }
+
+    @HelperMethodForLeftRecursion
+    @SyntacticRule("""
+            (ADD | SUB) exprMul exprAdd1 
+            | ε
+            """)
+    private boolean exprAdd1() throws SyntacticAnalyzerException {
+        if (consume(Token.Type.ADD)) {
+        } else if (consume(Token.Type.SUB)) {
+        } else {
+            return false;
+        }
+
+        if (exprMul()) {
+            if (exprAdd1()) {
+                return true;
+            } else {
+                throw new ExpectedExpressionException("Expected addition expression after multiplication expression.");
+            }
+        } else {
+            throw new ExpectedExpressionException("Expected multiplication expression after addition or subtraction operator.");
+        }
+    }
 
     @SyntacticRule("exprMul (MUL | DIV) exprCast | exprCast")
     @SyntacticRuleForLeftRecursion("exprCast exprMul1")
@@ -491,9 +621,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         int startIndex = currentIndex;
 
         if (consume(Token.Type.MUL)) {
-
         } else if (consume(Token.Type.DIV)) {
-
         } else {
             currentIndex = startIndex;
             return false;
@@ -535,7 +663,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
     }
 
     @SyntacticRule("(SUB | NOT) exprUnary | exprPostfix")
-    private boolean exprUnary() throws ExpectedExpressionException {
+    private boolean exprUnary() throws SyntacticAnalyzerException {
         int startIndex = currentIndex;
 
         if (consume(Token.Type.SUB)) {
@@ -591,8 +719,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
                 if (consume(Token.Type.RBRACKET)) {
                     if (exprPostfix1()) {
                         return true;
-                    }
-                    else {
+                    } else {
                         throw new ExpectedExpressionException("Expected postfix expression after ].");
                     }
                 } else {
@@ -605,13 +732,62 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             if (consume(Token.Type.ID)) {
                 if (exprPostfix1()) {
                     return true;
-                }
-                else {
+                } else {
                     throw new ExpectedExpressionException("Expected postfix expression after identifier.");
                 }
-            }
-            else {
+            } else {
                 throw new ExpectedTokenException("Expected identifier after dot operator.");
+            }
+        } else {
+            currentIndex = startIndex;
+            return false;
+        }
+    }
+
+    private boolean exprPrimary() throws SyntacticAnalyzerException {
+        int startIndex = currentIndex;
+
+        if (consume(Token.Type.ID)) {
+            if (consume(Token.Type.LPAR)) {
+                if (expr()) {
+                    while (true) {
+                        if (consume(Token.Type.COMMA)) {
+                            if (expr()) {
+
+                            } else {
+                                throw new ExpectedExpressionException("Expected expression after comma (,).");
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                if (consume(Token.Type.RPAR)) {
+                    return true;
+                } else {
+                    throw new ExpectedTokenException("Expected ) in primary expression.");
+                }
+            }
+
+            return true;
+        } else if (consume(Token.Type.CT_INT)) {
+            return true;
+        } else if (consume(Token.Type.CT_REAL)) {
+            return true;
+        } else if (consume(Token.Type.CT_CHAR)) {
+            return true;
+        } else if (consume(Token.Type.CT_STRING)) {
+            return true;
+        } else if (consume(Token.Type.LPAR)) {
+            if (expr()) {
+                if (consume(Token.Type.LPAR)) {
+                    return true;
+                } else {
+                    throw new ExpectedExpressionException("Expected ) after expression.");
+                }
+            } else {
+                throw new ExpectedExpressionException("Expected expression after (.");
             }
         } else {
             currentIndex = startIndex;
