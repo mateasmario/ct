@@ -19,7 +19,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             throw new UninitializedTokenListException("The token list was not explicitly set before starting the analysis.");
         }
 
-        while (currentIndex != tokens.size() - 1) {
+        while (currentIndex != tokens.size()) {
             unit();
         }
     }
@@ -41,8 +41,6 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
     @SyntacticRule("(declStruct | declFunc | declVar)* END")
     private boolean unit() throws SyntacticAnalyzerException {
-        int startIndex = currentIndex;
-
         while (true) {
             if (declStruct()) {
 
@@ -55,7 +53,12 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             }
         }
 
-        return true;
+        if (consume(Token.Type.END)) {
+            return true;
+        }
+        else {
+            throw new ExpectedTokenException("Expected END token at the end of the unit declaration.");
+        }
     }
 
     @SyntacticRule("STRUCT ID LACC declVar* RACC SEMICOLON")
@@ -337,12 +340,27 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
                 throw new ExpectedTokenException("Expected ; after return keyword.");
             }
         } else {
-            expr();
-            if (consume(Token.Type.SEMICOLON)) {
-                return true;
-            } else {
-                currentIndex = startIndex;
-                return false;
+            /*
+             Refacut sa puste daca nu punem ;
+             Basically, daca gaseste o expresie, trebuie ca mai departe sa avem SEMICOLON
+             Daca nu e vreo expresie, se poate termina si returna false daca nu avem SEMICOLON
+             */
+            if (expr()) {
+                if (consume(Token.Type.SEMICOLON)) {
+                    return true;
+                }
+                else {
+                    throw new ExpectedTokenException("Expected ; after expression.");
+                }
+            }
+            else {
+                if (consume(Token.Type.SEMICOLON)) {
+                    return true;
+                }
+                else {
+                    currentIndex = startIndex;
+                    return false;
+                }
             }
         }
     }
@@ -384,6 +402,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         }
     }
 
+    // This one is implemented a little different, as exprUnary and exprOr have the same prefix
     @SyntacticRule("exprUnary ASSIGN exprAssign | exprOr")
     private boolean exprAssign() throws SyntacticAnalyzerException {
         int startIndex = currentIndex;
@@ -396,9 +415,17 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
                     throw new ExpectedExpressionException("Expected an assignment expression after =.");
                 }
             } else {
-                throw new ExpectedTokenException("Expected assignment operator (=).");
+                // ToDo: Workaround to fix common prefixes in exprAssign
+                currentIndex = startIndex;
+                if (exprUnary()) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
             }
-        } else {
+        }
+        else {
             currentIndex = startIndex;
             return false;
         }
@@ -522,7 +549,6 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         }
     }
 
-    // ToDo: Finish exprRel, exprAdd
     @SyntacticRule("exprRel ( LESS | LESSEQ | GREATER | GREATEREQ ) exprAdd | exprAdd")
     @SyntacticRuleForLeftRecursion("exprAdd exprRel1")
     private boolean exprRel() throws SyntacticAnalyzerException {

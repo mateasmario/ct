@@ -547,6 +547,7 @@ public class StateBasedLexer implements Lexer {
             i++;
         }
 
+        tokens.add(new Token(Token.Type.END));
         return tokens;
     }
 
