@@ -55,8 +55,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
         if (consume(Token.Type.END)) {
             return true;
-        }
-        else {
+        } else {
             throw new ExpectedTokenException("Expected END token at the end of the unit declaration.");
         }
     }
@@ -340,27 +339,12 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
                 throw new ExpectedTokenException("Expected ; after return keyword.");
             }
         } else {
-            /*
-             Refacut sa puste daca nu punem ;
-             Basically, daca gaseste o expresie, trebuie ca mai departe sa avem SEMICOLON
-             Daca nu e vreo expresie, se poate termina si returna false daca nu avem SEMICOLON
-             */
-            if (expr()) {
-                if (consume(Token.Type.SEMICOLON)) {
-                    return true;
-                }
-                else {
-                    throw new ExpectedTokenException("Expected ; after expression.");
-                }
-            }
-            else {
-                if (consume(Token.Type.SEMICOLON)) {
-                    return true;
-                }
-                else {
-                    currentIndex = startIndex;
-                    return false;
-                }
+            expr();
+            if (consume(Token.Type.SEMICOLON)) {
+                return true;
+            } else {
+                currentIndex = startIndex;
+                return false;
             }
         }
     }
@@ -414,18 +398,14 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
                 } else {
                     throw new ExpectedExpressionException("Expected an assignment expression after =.");
                 }
-            } else {
-                // ToDo: Workaround to fix common prefixes in exprAssign
-                currentIndex = startIndex;
-                if (exprUnary()) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
             }
         }
-        else {
+
+        currentIndex = startIndex;
+
+        if (exprOr()) {
+            return true;
+        } else {
             currentIndex = startIndex;
             return false;
         }
@@ -452,11 +432,8 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
         if (consume(Token.Type.OR)) {
             if (exprAnd()) {
-                if (exprOr1()) {
-                    return true;
-                } else {
-                    throw new ExpectedExpressionException("Expected OR expression.");
-                }
+                exprOr1();
+                return true;
             } else {
                 throw new ExpectedExpressionException("Expected AND expression after || operator.");
             }
@@ -487,11 +464,8 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
         if (consume(Token.Type.AND)) {
             if (exprEq()) {
-                if (exprAnd1()) {
-                    return true;
-                } else {
-                    throw new ExpectedExpressionException("Expected AND expression.");
-                }
+                exprAnd1();
+                return true;
             } else {
                 throw new ExpectedExpressionException("Expected EQUALS expression after &&.");
             }
@@ -525,21 +499,15 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
         if (consume(Token.Type.EQUAL)) {
             if (exprRel()) {
-                if (exprEq1()) {
-                    return true;
-                } else {
-                    throw new ExpectedExpressionException("Expected equals expression after comparison expression.");
-                }
+                exprEq1();
+                return true;
             } else {
                 throw new ExpectedExpressionException("Expected comparison expression after = operator.");
             }
         } else if (consume(Token.Type.NOTEQ)) {
             if (exprRel()) {
-                if (exprEq1()) {
-                    return true;
-                } else {
-                    throw new ExpectedExpressionException("Expected equals expression after comparison expression.");
-                }
+                exprEq1();
+                return true;
             } else {
                 throw new ExpectedExpressionException("Expected comparison expression after != operator.");
             }
@@ -572,19 +540,15 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
 
         } else if (consume(Token.Type.LESSEQ)) {
         } else if (consume(Token.Type.GREATER)) {
-        }
-        if (consume(Token.Type.GREATEREQ)) {
+        } else if (consume(Token.Type.GREATEREQ)) {
         } else {
             currentIndex = startIndex;
             return false;
         }
 
         if (exprAdd()) {
-            if (exprRel1()) {
-                return true;
-            } else {
-                throw new ExpectedExpressionException("Expected comparison expression after addition expression.");
-            }
+            exprRel1();
+            return true;
         } else {
             throw new ExpectedExpressionException("Expected addition expression after comparison operator.");
         }
@@ -617,11 +581,8 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         }
 
         if (exprMul()) {
-            if (exprAdd1()) {
-                return true;
-            } else {
-                throw new ExpectedExpressionException("Expected addition expression after multiplication expression.");
-            }
+            exprAdd1();
+            return true;
         } else {
             throw new ExpectedExpressionException("Expected multiplication expression after addition or subtraction operator.");
         }
@@ -654,11 +615,8 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         }
 
         if (exprCast()) {
-            if (exprMul1()) {
-                return true;
-            } else {
-                throw new ExpectedExpressionException("Expected multiplication expression after cast expression.");
-            }
+            exprMul1();
+            return true;
         } else {
             throw new ExpectedExpressionException("Expected cast expression after multiplication (or division) operator.");
         }
@@ -684,7 +642,13 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             }
         } else {
             currentIndex = startIndex;
-            return false;
+
+            if (exprUnary()) {
+                return true;
+            } else {
+                currentIndex = startIndex;
+                return false;
+            }
         }
     }
 
@@ -743,11 +707,8 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
         if (consume(Token.Type.LBRACKET)) {
             if (expr()) {
                 if (consume(Token.Type.RBRACKET)) {
-                    if (exprPostfix1()) {
-                        return true;
-                    } else {
-                        throw new ExpectedExpressionException("Expected postfix expression after ].");
-                    }
+                    exprPostfix1();
+                    return true;
                 } else {
                     throw new ExpectedTokenException("Expected ] after expression.");
                 }
@@ -756,11 +717,8 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             }
         } else if (consume(Token.Type.DOT)) {
             if (consume(Token.Type.ID)) {
-                if (exprPostfix1()) {
-                    return true;
-                } else {
-                    throw new ExpectedExpressionException("Expected postfix expression after identifier.");
-                }
+                exprPostfix1();
+                return true;
             } else {
                 throw new ExpectedTokenException("Expected identifier after dot operator.");
             }
@@ -807,7 +765,7 @@ public class ResursiveDescendentSyntacticAnalyzer extends SyntacticAnalyzer {
             return true;
         } else if (consume(Token.Type.LPAR)) {
             if (expr()) {
-                if (consume(Token.Type.LPAR)) {
+                if (consume(Token.Type.RPAR)) {
                     return true;
                 } else {
                     throw new ExpectedExpressionException("Expected ) after expression.");
