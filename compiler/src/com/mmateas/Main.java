@@ -22,7 +22,7 @@ public class Main {
         List<String> readLines;
 
         try {
-            readLines = Files.readAllLines(Path.of("C:\\git\\ct\\test_programs\\2.c"));
+            readLines = Files.readAllLines(Path.of("C:\\git\\ct\\test_programs\\1.c"));
         } catch (IOException e) {
             throw new CompilerException("Could not read specified file.");
         }
